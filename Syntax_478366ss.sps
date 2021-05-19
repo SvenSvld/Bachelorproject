@@ -1,6 +1,6 @@
 ﻿* Encoding: UTF-8.
-*Bachelorproject.
-****Ophalen werkdata.
+* Bachelorproject Sven Strating.
+**** Ophalen werkdata.
 GET
   FILE='C:\Users\svens\OneDrive\Documenten\3_Bachelor_Sociology and Social Research\BLOK '+
     '7+8\Data-analyse\ESS2014.sav'
@@ -11,17 +11,17 @@ GET
     prtvtech prtvtdcz prtvede1 prtvede2 prtvtcdk prtvteee prtvtces prtvtcfi prtvtcfr prtvtbgb prtvtehu prtvtaie prtvtcil prtvalt1 
     prtvalt2 prtvalt3 prtvtfnl prtvtbno prtvtcpl prtvtbpt prtvtbse prtvtesi vote cntry idno rshpsts.
 DATASET NAME ESS2014 WINDOW=FRONT.
-*Ik selecteer alleen de landen die betrekking hebben op dit onderzoek.
+* Ik selecteer alleen de landen die betrekking hebben op dit onderzoek.
 SELECT IF NOT (cntry NE 'NL' and cntry NE 'GB' and cntry NE 'DE'
     and cntry NE 'GB' and cntry NE 'IE' and cntry NE 'FR' and cntry NE 'DK'
     and cntry NE 'SE' and cntry NE 'NO' and cntry NE 'BE').
 FREQUENCIES cntry.
-*Maak een staandaardgewicht aan welke in elke analyse moet worden meegenomen.
+* Maak een staandaardgewicht aan welke in elke analyse moet worden meegenomen.
 COMPUTE anweight=pspwght*pweight.
 WEIGHT by anweight.
 
 
-****Factoranalyse en betrouwbaarheidsanalyse over alle items rondom waargenomen bedreiging.
+**** Factoranalyse en betrouwbaarheidsanalyse over alle items rondom waargenomen bedreiging.
 * (1) Inspecteer variabelen Rlgueim Imtcjob Imbleco Imwbcrm.
 VARIABLE LEVEL Rlgueim Imtcjob Imbleco Imwbcrm (ORDINAL).
 fre Rlgueim Imtcjob Imbleco Imwbcrm.
@@ -79,7 +79,7 @@ COMPUTE Threat = MEAN.4(R_Rlgueim,R_Imtcjob,R_Imbleco,R_Imwbcrm).
 EXECUTE.
 
 
-****Variabelen ophalen.
+**** Variabelen ophalen.
 * (1) Dummy steun rechts_populistische partij aanmaken per land.
 COMPUTE dummy_rightwing = 0.
 EXECUTE.
@@ -428,8 +428,50 @@ CTABLES
   /CRITERIA CILEVEL=95.
 
 
-**** Hypothese 1: Inwoners die meer waargenomen bedreiging rapporteren ten aanzien van migranten hebben meer kans op steun voor een rechts-populistische partij.
-* (1) Alleen mensen die gestemd hebben meenemen in de analyse via filter en zonder Ierland.
+**** Outliers checken in niet-categorische data.
+GRAPH
+  /HISTOGRAM=agea.
+FREQUENCIES agea.
+GRAPH
+  /HISTOGRAM=eduyrs.
+FREQUENCIES eduyrs.
+
+
+**** Hypothese 1a: Inwoners die meer waargenomen bedreiging rapporteren ten aanzien van migranten 
+    hebben meer kans op steun voor een rechts-populistische partij (inclusief 'grandmodel' voor mediatie').
+* (1) Voorwaarden logistische regressie checken.
+**Variable type 
+    X = schaal
+    Y = nominaal (0 1)
+**Onafhankelijke observaties.
+**Geen multicollineariteit ~ VIF 1 ~ dit kan gewoon via een lineaire regressie.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT dummy_rightwing
+  /METHOD=ENTER Threat MIPEX dummy_sociaaldemocratisch
+  /SCATTERPLOT=(*ZPRED ,*ZRESID).
+**Lineaire relatie X met Y(logit) ~ Box-Tidwell Transformation zonder Ierland en alleen mensen die gestemd hebben.
+COMPUTE Logit_threat = Threat.
+IF (Threat GT 0) Logit_threat = LN(Threat)*Threat.
+USE ALL.
+COMPUTE Logit_threatinteractie = Logit_threat*Threat.
+EXECUTE.
+COMPUTE filter_$=(Logit_threat > 0 and cntry ~= 'IE' and vote=1).
+VARIABLE LABELS filter_$ "Logit_threat > 0 and cntry ~= 'IE' and vote=1 (FILTER)".
+VALUE LABELS filter_$ 0 'Not Selected' 1 'Selected'.
+FORMATS filter_$ (f1.0).
+FILTER BY filter_$.
+EXECUTE.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER Threat Logit_threatinteractie 
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+FILTER OFF.
+USE ALL.
+EXECUTE.
+* (2) Alleen mensen die gestemd hebben meenemen in de analyse via filter en zonder Ierland.
 USE ALL.
 COMPUTE filter_$=(vote=1 and cntry ~= 'IE').
 VARIABLE LABELS filter_$ "vote=1 and cntry ~= 'IE' (FILTER)".
@@ -437,8 +479,215 @@ VALUE LABELS filter_$ 0 'Not Selected' 1 'Selected'.
 FORMATS filter_$ (f1.0).
 FILTER BY filter_$.
 EXECUTE.
-* (2) Voorwaarden logistische regressie checken (inclusief outliers etc.).
 * (3) Logistische regressie.
-* (4) Conclusie: 
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER Threat 
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend 
+  /METHOD=ENTER dummy_sociaaldemocratisch MIPEX 
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+**** Hypothese 1b: De relatie tussen waargenomen bedreiging ten aanzien van migranten 
+    en kans op steun voor een rechts-populistische partij wordt versterkt door het aantal migranten in een land.
+* (1) Laat het filter aanstaan.
+* (2) Multicollineariteit checken ~ Value Inflation Factor (VIF) 1 ~ dit kan gewoon via een lineaire regressie.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT dummy_rightwing
+  /METHOD=ENTER Threat perc_migranten
+  /SCATTERPLOT=(*ZPRED ,*ZRESID).
+* (3) Box-Tidwell Transformation is al nagegaan. Er is sprake van een lineaire relatie tussen X en Y(logit).
+* (4) Bereken de interactievariabele.
+COMPUTE Cross_ThreatPercmigranten = Threat*perc_migranten.
+EXECUTE.
+* (5) Logistische regressie.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER Threat perc_migranten Cross_ThreatPercmigranten agea R_gndr R_blgetmg eduyrs 
+    dummy_deciel2 dummy_deciel3 dummy_deciel4 dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 
+    dummy_deciel9 dummy_deciel10 rlgdgr dummy_werkloos dummy_zelfstandige dummy_loondienst 
+    dummy_grootstedelijk dummy_stedelijk dummy_getrouwd dummy_partnerschap dummy_samenwonend 
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
 
 
+**** Hypothese 2a: Inwoners uit sociaaldemocratische welvaartsstaatregimes hebben minder kans op steun voor een rechts-populistisch partij
+    dan inwoners uit een liberaal of conservatief welvaartsstaatregime.
+* (1) Laat het filter aanstaan.
+* (2) Multicollineairiteit hoef ik niet te checken.
+* (3) Box-Tidwell Transformation hoef ik niet te checken.
+* (4) Logistische regressie.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER dummy_sociaaldemocratisch 
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend 
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+
+
+**** Hypothese 3a: Inwoners uit landen met een beter integratiebeleid hebben minder kans op steun voor een rechts-populistisch partij
+    dan inwoners uit een land met een slecht integratiebeleid.
+* (1) Voorwaarden logistische regressie checken.
+**Variable type 
+    X = schaal
+    Y = nominaal (0 1)
+* (2) Multicollineairiteit hoef ik niet te checken.
+* (3) Lineaire relatie X met Y(logit) ~ Box-Tidwell Transformation zonder Ierland en alleen mensen die gestemd hebben.
+FILTER OFF.
+USE ALL.
+EXECUTE.
+COMPUTE Logit_MIPEX = MIPEX.
+IF (MIPEX GT 0) Logit_MIPEX = LN(MIPEX)*MIPEX.
+COMPUTE Logit_MIPEXinteractie = Logit_MIPEX*MIPEX.
+EXECUTE.
+USE ALL. 
+COMPUTE filter_$=(Logit_MIPEX > 0 and cntry ~= 'IE' and vote=1).
+VARIABLE LABELS filter_$ "Logit_MIPEX > 0 and cntry ~= 'IE' and vote=1 (FILTER)".
+VALUE LABELS filter_$ 0 'Not Selected' 1 'Selected'.
+FORMATS filter_$ (f1.0).
+FILTER BY filter_$.
+EXECUTE.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER MIPEX Logit_MIPEXinteractie 
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+FILTER OFF.
+USE ALL.
+EXECUTE.
+**Polynominal regression uitvoeren. Er is blijkbaar een 'optimaal' optimaal punt in de MIPEX
+    Ik centreer hierbij geen controlevariabelen.
+DESCRIPTIVES MIPEX.
+COMPUTE MIPEX.gecentreerd = MIPEX-58.9573.
+EXECUTE.
+FREQUENCIES MIPEX.gecentreerd.
+*Gecentreerde MIPEX = 0 = 59.
+COMPUTE MIPEX.gecentreerd.squared = MIPEX.gecentreerd**2.
+EXECUTE.
+FREQUENCIES MIPEX.gecentreerd.squared.
+* (4) Alleen mensen die gestemd hebben meenemen in de analyse via filter en zonder Ierland.
+USE ALL.
+COMPUTE filter_$=(vote=1 and cntry ~= 'IE').
+VARIABLE LABELS filter_$ "vote=1 and cntry ~= 'IE' (FILTER)".
+VALUE LABELS filter_$ 0 'Not Selected' 1 'Selected'.
+FORMATS filter_$ (f1.0).
+FILTER BY filter_$.
+EXECUTE.
+* (5) Regressie uitvoeren.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER MIPEX.gecentreerd MIPEX.gecentreerd.squared 
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend 
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+
+**** Hypothese 2b en Hypothese 3b: Hypotheses 2a en 3a kunnen verklaard worden via 'waargenomen bedreiging ten aanzien van migranten'.
+* (1) Filter aan laten staan.
+* (2) Run twee aparte lineaire modellen op Y (waargenomen bedreiging ten aanzien van migranten).
+* (3) Test assumpties van lineariteit.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT Threat
+  /METHOD=ENTER dummy_sociaaldemocratisch
+  /SCATTERPLOT=(*ZPRED ,*ZRESID)
+  /SAVE COOK.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT Threat
+  /METHOD=ENTER MIPEX
+  /SCATTERPLOT=(*ZPRED ,*ZRESID)
+  /SAVE COOK.
+* (4) Lineaire regressie.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT Threat
+  /METHOD=ENTER dummy_sociaaldemocratisch
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT Threat
+  /METHOD=ENTER MIPEX
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend.
+
+
+**** Padanalyse ophalen.
+* (1) Standardized beta weights berekenen voor X1,M,X2 op Y.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER dummy_sociaaldemocratisch MIPEX Threat 
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend
+  /SAVE=PRED
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+DESCRIPTIVES VARIABLES=dummy_sociaaldemocratisch Threat MIPEX PRE_1
+  /STATISTICS=MEAN STDDEV.
+* (2) Standardized beta weights berekenen voor X1,X2 op M.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT Threat
+  /METHOD=ENTER MIPEX dummy_sociaaldemocratisch
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend.
+
+
+**** Losse mediatie-effecten ophalen.
+* (1) Soc.democratisch en Threat op steun rechts-populistisch.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER dummy_sociaaldemocratisch Threat 
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend
+   /SAVE=PRED
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+DESCRIPTIVES VARIABLES=dummy_sociaaldemocratisch Threat PRE_2
+  /STATISTICS=MEAN STDDEV.
+
+* (2) MIPEX op dummy_rightwing.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER MIPEX
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend
+   /SAVE=PRED
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+DESCRIPTIVES VARIABLES=MIPEX PRE_3
+  /STATISTICS=MEAN STDDEV.
+
+* (3) MIPEX,threat op dummy_rightwing.
+LOGISTIC REGRESSION VARIABLES dummy_rightwing
+  /METHOD=ENTER MIPEX Threat
+  /METHOD=ENTER agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_zelfstandige dummy_loondienst dummy_grootstedelijk dummy_stedelijk 
+    dummy_getrouwd dummy_partnerschap dummy_samenwonend
+  /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
+DESCRIPTIVES VARIABLES=MIPEX threat
+  /STATISTICS=MEAN STDDEV.
