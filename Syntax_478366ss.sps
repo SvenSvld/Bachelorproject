@@ -1,5 +1,5 @@
 ﻿* Encoding: UTF-8.
-* Bachelorproject Sven Strating.
+* Bachelorproject Sven.
 **** Ophalen werkdata.
 GET
   FILE='C:\Users\svens\OneDrive\Documenten\3_Bachelor_Sociology and Social Research\BLOK '+
