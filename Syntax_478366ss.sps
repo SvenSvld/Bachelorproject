@@ -13,7 +13,7 @@ GET
 DATASET NAME ESS2014 WINDOW=FRONT.
 * Ik selecteer alleen de landen die betrekking hebben op dit onderzoek.
 SELECT IF NOT (cntry NE 'NL' and cntry NE 'GB' and cntry NE 'DE'
-    and cntry NE 'GB' and cntry NE 'IE' and cntry NE 'FR' and cntry NE 'DK'
+    and cntry NE 'IE' and cntry NE 'FR' and cntry NE 'DK'
     and cntry NE 'SE' and cntry NE 'NO' and cntry NE 'BE').
 FREQUENCIES cntry.
 * Maak een staandaardgewicht aan welke in elke analyse moet worden meegenomen.
