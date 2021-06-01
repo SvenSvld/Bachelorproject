@@ -421,6 +421,18 @@ FREQUENCIES VARIABLES=COO_1 COO_2
   /ORDER=ANALYSIS.
 
 
+**** Multicollineariteit checken.
+REGRESSION
+  /MISSING LISTWISE
+  /STATISTICS COEFF OUTS R ANOVA COLLIN TOL
+  /CRITERIA=PIN(.05) POUT(.10)
+  /NOORIGIN 
+  /DEPENDENT dummy_rightwing
+  /METHOD=ENTER Threat agea R_gndr R_blgetmg eduyrs dummy_deciel2 dummy_deciel3 dummy_deciel4 
+    dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
+    dummy_werkloos dummy_stedelijk dummy_grootstedelijk dummy_samenwonend.
+
+
 **** Hypothese 1a: Inwoners die meer waargenomen bedreiging rapporteren ten aanzien van migranten 
     hebben meer kans op steun voor een rechts-populistische partij.
 LOGISTIC REGRESSION VARIABLES dummy_rightwing
@@ -428,7 +440,7 @@ LOGISTIC REGRESSION VARIABLES dummy_rightwing
     dummy_deciel5 dummy_deciel6 dummy_deciel7 dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr 
     dummy_werkloos dummy_stedelijk dummy_grootstedelijk dummy_samenwonend 
   /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
-*** Hypothese 1b: De relatie tussen waargenomen bedreiging ten aanzien van migranten 
+**** Hypothese 1b: De relatie tussen waargenomen bedreiging ten aanzien van migranten 
     en kans op steun voor een rechts-populistische partij wordt versterkt door het aantal migranten in een land.
 * (1) Bereken de interactievariabele.
 COMPUTE Cross_Threat.Percmigranten = Threat*perc_migranten.
@@ -442,7 +454,7 @@ LOGISTIC REGRESSION VARIABLES dummy_rightwing
   /CRITERIA=PIN(0.05) POUT(0.10) ITERATE(20) CUT(0.5).
 
 
-*** Hypothese 2a: Inwoners uit sociaaldemocratische welvaartsstaatregimes hebben minder kans 
+**** Hypothese 2a: Inwoners uit sociaaldemocratische welvaartsstaatregimes hebben minder kans 
     op steun voor een rechts-populistisch partij dan inwoners uit een liberaal of conservatief welvaartsstaatregime.
 LOGISTIC REGRESSION VARIABLES dummy_rightwing
   /METHOD=ENTER dummy_sociaaldemocratisch agea R_gndr R_blgetmg eduyrs dummy_deciel2 
@@ -505,6 +517,6 @@ REGRESSION
     dummy_deciel8 dummy_deciel9 dummy_deciel10 rlgdgr dummy_werkloos 
     dummy_stedelijk dummy_grootstedelijk dummy_samenwonend.
 
-*Standaarddeviatie per predictor ophalen.
+**** Standaarddeviatie per predictor ophalen.
 DESCRIPTIVES VARIABLES=dummy_sociaaldemocratisch MIPEX Threat
   /STATISTICS=MEAN STDDEV MIN MAX.
